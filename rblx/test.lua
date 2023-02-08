@@ -18,7 +18,7 @@ local db = mongodb.new({
 local playersDB = db:getCollection("players")
 
 -- 플레이어 데이터 캐시 (플레이어 나가면 사라지도록 __mod = "k" 부여)
-local playerDatas = setmetatable({},{__mod="k"})
+local playerDatas = setmetatable({},{__mode="k"})
 
 local function saveUserData(id,data)
 	data._id = nil -- _id 값은 mongodb 가 자동생성해서 설정불가능함
