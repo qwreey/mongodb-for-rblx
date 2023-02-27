@@ -17,8 +17,8 @@ local db = mongodb.new({
 -- 문서모음 가져오기
 local playersDB = db:getCollection("players")
 
--- 플레이어 데이터 캐시 (플레이어 나가면 사라지도록 __mod = "k" 부여)
-local playerDatas = setmetatable({},{__mode="k"})
+-- 플레이어 데이터 캐시
+local playerDatas = {}
 
 local function saveUserData(id,data)
 	data._id = nil -- _id 값은 mongodb 가 자동생성해서 설정불가능함
@@ -59,6 +59,7 @@ local function playerAdded(player:Player)
 	-- 2 분마다 업데이트
 	task.spawn(function()
 		while wait(60*2) do
+			if not playerDatas[player] then break end
 			-- 고정밀한 시간측정 필요없으므로 wait 넣는게 괜찮음
 			-- task.wait 은 매 서버 프레임마다 확인하기에 정확하지만
 			-- 그정도까지 서버가 노력하게 만들 필요는 없음
