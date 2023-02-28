@@ -81,6 +81,7 @@ end
 -- 플레이어 나감
 local function playerRemoving(player:Player)
 	local userData = playerDatas[player]
+	if not userData then return end
 	playerDatas[player] = nil
 	local updateResult = saveUserData(player.UserId,userData)
 
@@ -97,6 +98,6 @@ end
 game.Players.PlayerRemoving:Connect(playerRemoving)
 game:BindToClose(function()
 	for _,player in game.Players:GetPlayers() do
-		playerRemoving(player)
+		if playerDatas[player] then playerRemoving(player) end
 	end
 end)
