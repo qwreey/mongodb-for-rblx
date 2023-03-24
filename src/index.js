@@ -92,6 +92,7 @@ server.post('/collection/*', {
 
 server.listen({
     port: settings.port,
+    host: settings.host
 }, function (err) {
     if (err) throw err
     server.log.info(`server listening on ${server.server.address().port}`)
