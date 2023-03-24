@@ -60,7 +60,8 @@ server.post('/collection/*', {
         case "findAll":
             try {
                 let result = await collection.find(data.model,data.options).toArray()
-                reply.send({result: result})
+                if (!result) reply.send({type: "null"})
+		else reply.send({result: result, type: "array"})
             } catch (err) {
                 server.log.info(`MONGODB: ${err}`)
                 reply.send({type: "array",err: err|"Unknown error"})
