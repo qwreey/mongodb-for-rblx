@@ -33,6 +33,9 @@ server.post('/collection/*', {
     }
 
     let data = JSON.parse(body)
+
+    if (data.model == "$EMPTY") data.model = {}
+
     switch (data.action) {
         case "find":
             try {

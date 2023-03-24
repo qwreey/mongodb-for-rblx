@@ -1,6 +1,8 @@
 local httpService = game:GetService("HttpService")
 
-local requestHandler = {}
+local requestHandler = {
+    EmptyMatchModel = "$EMPTY"
+}
 local sha1 = require(script.Parent.sha1)
 
 ---@class mongodbResult

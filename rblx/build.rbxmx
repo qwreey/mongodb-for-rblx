@@ -1,0 +1,373 @@
+<roblox version="4">
+  <Item class="ModuleScript" referent="0">
+    <Properties>
+      <string name="Name">roMongoDB</string>
+      <string name="Source"><![CDATA[---@class mongodb
+local mongodb = {}
+mongodb.__index = mongodb
+
+---@module collection
+local collection = require(script.collection)
+local sha1 = require(script.sha1)
+
+function mongodb.new(options)
+    return setmetatable({
+        url=options.url;
+        secret=sha1(options.secret);
+        debug = options.debug;
+    },mongodb)
+end
+
+---@return mongodbCollection
+function mongodb:getCollection(collectionName)
+    return collection.new(self,collectionName)
+end
+
+return mongodb
+]]></string>
+    </Properties>
+    <Item class="ModuleScript" referent="1">
+      <Properties>
+        <string name="Name">collection</string>
+        <string name="Source"><![CDATA[local requestHandler = require(script.Parent.requestHandler) ---@module requestHandler
+
+---@class mongodbCollection
+local collection = {}
+collection.__index = collection
+
+---@return mongodbCollection
+function collection.new(db,collectionName,t)
+    t = t or {}
+    t.db = db
+    t.name = collectionName
+    return setmetatable(t,collection)
+end
+
+---@param matchModel table table Match model, you can use compare operation too
+---@param options table|nil
+---@return mongodbResult
+---Find datas from collection with match model, you can add more opttions such as sorting with options argment. to find more information, checkout related links
+---  
+---example : handle error
+---db:find({id=1}):hasError():boolean|string
+---  
+---example : compare operations  
+---print(db:find({id={["$lte"]=70}}):getResult())
+---  
+---Related Links  
+---compare operations https://koonsland.tistory.com/174  
+---options https://mongodb.github.io/node-mongodb-native/4.0//interfaces/findoptions.html
+function collection:find(matchModel,options)
+    return requestHandler.request(self.db,self.name,
+        {action="find",model=matchModel,options=options}
+    )
+end
+
+---@param matchModel table Match model, you can use compare operation too
+---@param options table|nil
+---@return mongodbResult
+---Find all datas from collection with match model, you can add more opttions such as sorting with options argment. to find more information, checkout related links
+---  
+---example : handle error
+---db:find({id=1}):hasError():boolean|string
+---  
+---example : compare operations  
+---db:findAll({id={["$lte"]=70}}):forEach(function(item,key) print(item) end)
+---  
+---Related Links  
+---compare operations https://koonsland.tistory.com/174  
+---options https://mongodb.github.io/node-mongodb-native/4.0//interfaces/findoptions.html
+function collection:findAll(matchModel,options)
+    return requestHandler.request(self.db,self.name,
+        {action="findAll",model=matchModel,options=options}
+    )
+end
+
+---@param matchModel table
+---@param updateModel table
+---@return mongodbResult
+---Find all datas from collection with match model and update it, return result is updated data, for find more information about matchModel, checkout collection:find()
+function collection:update(matchModel,updateModel)
+    return requestHandler.request(self.db,self.name,
+        {action="update",model=matchModel,update=updateModel}
+    )
+end
+
+---@param deleteModel table
+---@return mongodbResult
+---Delete datas from collection with match model, for find more information about matchModel, checkout collection:find()
+function collection:delete(deleteModel)
+    return requestHandler.request(self.db,self.name,
+        {action="delete",model=deleteModel}
+    )
+end
+
+---@param insertModel table
+---@return mongodbResult
+---Create new data into collection
+function collection:insert(insertModel)
+    return requestHandler.request(self.db,self.name,
+        {action="insert",insert=insertModel}
+    )
+end
+
+return collection
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="ModuleScript" referent="2">
+      <Properties>
+        <string name="Name">requestHandler</string>
+        <string name="Source"><![CDATA[local httpService = game:GetService("HttpService")
+
+local requestHandler = {}
+local sha1 = require(script.Parent.sha1)
+
+---@class mongodbResult
+local resultHandler = {}
+resultHandler.__index = resultHandler
+
+local function getError(self)
+    if self.err then return self.err end
+    if self.error then
+        return table.concat(self.error," ",self.message or "")
+    end
+end
+
+function resultHandler:hasError()
+    local err = getError(self)
+    if not err then
+        return false
+    end
+    return err
+end
+
+function resultHandler:isNull()
+    local err = getError(self)
+    if err then
+        error(err)
+    end
+    return self.type == "null"
+end
+
+function resultHandler:isArray()
+    local err = getError(self)
+    if err then
+        error(err)
+    end
+    return self.type == "array"
+end
+
+function resultHandler:getResult()
+    local err = getError(self)
+    if err then
+        error(err)
+    end
+    if self.type == "null" then return nil end
+    return self.result
+end
+
+function resultHandler:forEach(func)
+    local err = getError(self)
+    if err then
+        error(err)
+    end
+    if self.type ~= "array" then
+        error(("data type must be array, but got %s. maybe data is not exist?")
+            :format(tostring(self.type)))
+    end
+    for i,v in pairs(self.result) do
+        func(v,i)
+    end
+end
+
+function resultHandler:iterator()
+    local err = getError(self)
+    if err then
+        error(err)
+    end
+    if self.type ~= "array" then
+        error(("data type must be array, but got %s. maybe data is not exist?")
+            :format(tostring(self.type)))
+    end
+    if self.type == "null" then return nil end
+    return pairs(self.result)
+end
+
+local function request(db,collectionName,body)
+    local strBody = httpService:JSONEncode(body)
+    local url = table.concat{db.url,"/collection/",httpService:UrlEncode(collectionName)}
+
+    if db.debug then
+        warn(("MONGODB: send request\nurl: %s\nbody: %s"):format(url,strBody))
+    end
+
+    local data = httpService:JSONDecode(httpService:PostAsync(
+        url,strBody,Enum.HttpContentType.TextPlain,false,{
+            secret=sha1(strBody..db.secret);
+        }
+    ))
+    return data
+end
+
+---@param db mongodb
+---@return mongodbResult
+function requestHandler.request(db,collectionName,body)
+    local passed,result = pcall(request,db,collectionName,body)
+    if not passed then
+        result = {err = result}
+    end
+    return setmetatable(result,resultHandler)
+end
+
+return requestHandler
+]]></string>
+      </Properties>
+    </Item>
+    <Item class="ModuleScript" referent="3">
+      <Properties>
+        <string name="Name">sha1</string>
+        <string name="Source">-- I claim no copyright over this source code and you can use it for whatever you want. Just don't sue me.
+
+local INIT_0 = 0x67452301
+local INIT_1 = 0xEFCDAB89
+local INIT_2 = 0x98BADCFE
+local INIT_3 = 0x10325476
+local INIT_4 = 0xC3D2E1F0
+
+local APPEND_CHAR = string.char(0x80)
+local INT_32_CAP = 2^32
+
+---Packs four 8-bit integers into one 32-bit integer
+local function packUint32(a, b, c, d)
+    return bit32.lshift(a, 24)+bit32.lshift(b, 16)+bit32.lshift(c, 8)+d
+end
+
+---Unpacks one 32-bit integer into four 8-bit integers
+local function unpackUint32(int)
+    return bit32.extract(int, 24, 8), bit32.extract(int, 16, 8),
+           bit32.extract(int, 08, 8), bit32.extract(int, 00, 8)
+end
+
+local function F(t, A, B, C)
+    if t &lt;= 19 then
+        -- C ~ (A &amp; (B ~ C)) has less ops than (A &amp; B) | (~A &amp; C)
+        return bit32.bxor(C, bit32.band(A, bit32.bxor(B, C)))
+    elseif t &lt;= 39 then
+        return bit32.bxor(A, B, C)
+    elseif t &lt;= 59 then
+        -- A | (B | C) | (B &amp; C) has less ops than (A &amp; B) | (A &amp; C) | (B &amp; C)
+        return bit32.bor(bit32.band(A, bit32.bor(B, C)), bit32.band(B, C))
+    else
+        return bit32.bxor(A, B, C)
+    end
+end
+
+local function K(t)
+    if t &lt;= 19 then
+        return 0x5A827999
+    elseif t &lt;= 39 then
+        return 0x6ED9EBA1
+    elseif t &lt;= 59 then
+        return 0x8F1BBCDC
+    else
+        return 0xCA62C1D6
+    end
+end
+
+local function preprocessMessage(message)
+    local initMsgLen = #message*8 -- Message length in bits
+    local msgLen = initMsgLen+8
+    local nulCount = 4 -- This is equivalent to 32 bits.
+    -- We're packing 32 bits of size, but the SHA-1 standard calls for 64, meaning we have to add at least 32 0s
+    message = message..APPEND_CHAR
+    while (msgLen+64)%512 ~= 0 do
+        nulCount = nulCount+1
+        msgLen = msgLen+8
+    end
+    message = message..string.rep("\0", nulCount)
+    message = message..string.char(unpackUint32(initMsgLen))
+    return message
+end
+
+local function sha1(message)
+    local message = preprocessMessage(message)
+
+    local H0 = INIT_0
+    local H1 = INIT_1
+    local H2 = INIT_2
+    local H3 = INIT_3
+    local H4 = INIT_4
+
+    local W = {}
+    for chunkStart = 1, #message, 64 do
+        local place = chunkStart
+        for t = 0, 15 do
+            W[t] = packUint32(string.byte(message, place, place+3))
+            place = place+4
+        end
+        for t = 16, 79 do
+            W[t] = bit32.lrotate(bit32.bxor(W[t-3], W[t-8], W[t-14], W[t-16]), 1)
+        end
+
+        local A, B, C, D, E = H0, H1, H2, H3, H4
+
+        for t = 0, 79 do
+            local TEMP = ( bit32.lrotate(A, 5)+F(t, B, C, D)+E+W[t]+K(t) )%INT_32_CAP
+
+            E, D, C, B, A = D, C, bit32.lrotate(B, 30), A, TEMP
+        end
+
+        H0 = (H0+A)%INT_32_CAP
+        H1 = (H1+B)%INT_32_CAP
+        H2 = (H2+C)%INT_32_CAP
+        H3 = (H3+D)%INT_32_CAP
+        H4 = (H4+E)%INT_32_CAP
+    end
+    local result = string.format("%08x%08x%08x%08x%08x", H0, H1, H2, H3, H4)
+    return result
+end
+
+return sha1</string>
+      </Properties>
+    </Item>
+    <Item class="ModuleScript" referent="4">
+      <Properties>
+        <string name="Name">types</string>
+        <string name="Source"><![CDATA[export type resultHandlerType = {
+    hasError: (self:resultHandlerType)->boolean|string;
+    getResult: (self:resultHandlerType)->table;
+    forEach: (self:resultHandlerType,func:(key:string,value:any)->nil)->nil;
+    iterator: ()->();
+    isArray: (self:resultHandlerType)->boolean;
+    isNull: (self:resultHandlerType)->boolean;
+}
+
+export type requestHandlerType = {
+    request: ()->resultHandlerType;
+}
+
+export type collection = {
+    find: (self:collection,matchModel:table,options:table|nil)->resultHandlerType;
+    findAll: (self:collection,matchModel:table,options:table|nil)->resultHandlerType;
+    update: (self:collection,matchModel:table,updateModel:table)->resultHandlerType;
+    delete: (self:collection,deleteModel:table)->resultHandlerType;
+    insert: (self:collection,insertModel:table)->resultHandlerType;
+}
+
+export type shaString = string
+
+export type mongodb = {
+    new: ()->mongodb;
+    getCollection: (collectionName)->collection;
+    url: string;
+    secret: shaString;
+    debug: boolean|nil;
+}
+
+return {}
+]]></string>
+      </Properties>
+    </Item>
+  </Item>
+</roblox>

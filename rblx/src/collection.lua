@@ -80,4 +80,23 @@ function collection:insert(insertModel)
     )
 end
 
+function collection:sharedFind(id,matchModel,updateInterval,onUpdate)
+    if updateInterval<30 then
+        error("updateInterval must be higher then ")
+    end
+
+    local requestBody = {
+        action="sharedFind";
+        model=matchModel;
+        id = id;
+        updateInterval=updateInterval;
+    }
+
+    while true do
+        local data = requestHandler.request(self.db,self.name,requestBody)
+        coroutine.wrap(onUpdate)(data)
+        wait(updateInterval-10)
+    end
+end
+
 return collection
