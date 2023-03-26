@@ -19,6 +19,7 @@ local playersDB = db:getCollection("players")
 
 -- 플레이어 데이터 캐시
 local playerDatas = {}
+local loopIds = {} -- 들낙시 여러 루프가 동시에 도는거 방지
 
 local function saveUserData(id,data)
 	data._id = nil -- _id 값은 mongodb 가 자동생성해서 설정불가능함
@@ -46,7 +47,7 @@ local function playerAdded(player:Player)
 
 	-- 새로운 유저라 값 없음
 	if findResult:isNull() then
-		userData = {id=player.UserId}
+		userData = {id=userID}
 		local insertResult = playersDB:insert(userData)
 		if insertResult:hasError() then
 			error(insertResult:hasError())
@@ -55,11 +56,15 @@ local function playerAdded(player:Player)
 		userData = findResult:getResult()
 	end
 	playerDatas[player] = userData
+	loopIds[userID] = (loopIds[userID] or 0) + 1
+	local currentLoopId = loopIds[userID]
 
 	-- 2 분마다 업데이트
 	task.spawn(function()
 		while wait(60*2) do
 			if not playerDatas[player] then break end
+			if loopIds[userID] ~= currentLoopId then break end
+
 			-- 고정밀한 시간측정 필요없으므로 wait 넣는게 괜찮음
 			-- task.wait 은 매 서버 프레임마다 확인하기에 정확하지만
 			-- 그정도까지 서버가 노력하게 만들 필요는 없음
@@ -74,7 +79,7 @@ local function playerAdded(player:Player)
 	-- 테스트
 	print(userData)
 	if not userData.money then userData.money = 1 end
-	userData.money += 100
+	userData.money = userData.money + 100
 	print(userData.money)
 end
 
