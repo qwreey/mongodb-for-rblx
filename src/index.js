@@ -1,13 +1,17 @@
 import { fastify } from "fastify"
 import mongodb from "mongodb"
 import sha1 from "js-sha1"
-import settings from "../settings.json" assert { type: "json" }
+import * as fs from 'fs'
+const settings = fs.existsSync("../settings.json") ? {} : JSON.parse( fs.readFileSync("../settings.json") )
+function getSetting(key) {
+	return settings[key] ?? process.env[key]
+}
 
-const mongoClient = await new mongodb.MongoClient(settings.mongodbURL).connect()
-const db = mongoClient.db(settings.dbName)
+const mongoClient = await new mongodb.MongoClient(getSetting("mongodbURL")).connect()
+const db = mongoClient.db(getSetting("dbName"))
 const server = fastify({ logger: true })
 const collections = {}
-const secretSha = sha1(settings.secret)
+const secretSha = sha1(getSetting("secret"))
 
 server.post('/collection/*', {
     schema: {
@@ -92,8 +96,8 @@ server.post('/collection/*', {
 })
 
 server.listen({
-    port: settings.port,
-    host: settings.host
+    port: getSetting("port"),
+    host: getSetting("host")
 }, function (err) {
     if (err) throw err
     server.log.info(`server listening on ${server.server.address().port}`)
