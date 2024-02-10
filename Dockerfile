@@ -1,11 +1,10 @@
 FROM node:alpine
 
-ADD src /app/src
-ADD package.json /app/src/package.json
-
+ADD package.json /app/package.json
 WORKDIR /app
 RUN \
-	npm i && \
+	npm i
+ADD src /app/src
 
 CMD [ "npm", "run", "start" ]
 

@@ -87,6 +87,7 @@ local function request(db,collectionName,body)
     local data = httpService:JSONDecode(httpService:PostAsync(
         url,strBody,Enum.HttpContentType.TextPlain,false,{
             secret=sha1(strBody..db.secret);
+	    keyhash=sha1(db.secret);
         }
     ))
     return data
