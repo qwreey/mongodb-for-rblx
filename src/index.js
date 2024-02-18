@@ -59,6 +59,15 @@ function checkPermission(action,keyhash,secret,body) {
 	return true
 }
 
+server.post('/auth', async (request, reply) => {
+	let body = request.body
+	let data = JSON.parse(body)
+	if (!checkPermission(data.action, request.headers.keyhash, request.headers.secret, body)) {
+		reply.send({"err":"CHECKSUM FAILED (auth failed)"})
+		return
+	}
+	reply.send({"result": "ok", "payload": data})
+})
 server.post('/collection/*', {
 	schema: {
 		params: {
