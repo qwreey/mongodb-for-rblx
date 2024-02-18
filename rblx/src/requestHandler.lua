@@ -84,10 +84,16 @@ local function request(db,collectionName,body)
         warn(("MONGODB: send request\nurl: %s\nbody: %s"):format(url,strBody))
     end
 
+    local keyhash = db.secrethash
+    if not keyhash then
+        keyhash = sha1(db.secret)
+        db.secrethash = keyhash 
+    end
+
     local data = httpService:JSONDecode(httpService:PostAsync(
         url,strBody,Enum.HttpContentType.TextPlain,false,{
             secret=sha1(strBody..db.secret);
-	    keyhash=sha1(db.secret);
+	    keyhash=keyhash;
         }
     ))
     return data

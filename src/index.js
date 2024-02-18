@@ -50,11 +50,13 @@ const tokenPermission = {
 	}
 }
 console.log(secrets)
-function checkPermission(action,keyhash,secret) {
+function checkPermission(action,keyhash,secret,body) {
 	if (!action || !keyhash || !secret) return false
 	const secretFound = secrets.find(secret=>secret.hash === keyhash)
 	if (!secretFound) return false
-	return secretFound[action] ?? false
+	if (action != "auth" && !secretFound[action]) return false
+	if (secret != sha1(body+secretFound.key)) return false
+	return true
 }
 
 server.post('/collection/*', {
@@ -68,7 +70,7 @@ server.post('/collection/*', {
 }, async (request, reply) => {
 	let body = request.body
 	let data = JSON.parse(body)
-	if (checkPermission(data.action, request.headers.keyhash, request.headers.secret)) {
+	if (!checkPermission(data.action, request.headers.keyhash, request.headers.secret, body)) {
 		reply.send({"err":"CHECKSUM FAILED (auth failed)"})
 		return
 	}
